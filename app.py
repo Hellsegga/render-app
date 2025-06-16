@@ -33,6 +33,7 @@ IMAGE_DISPLAY_MODE = 'reconstruction'
 
 # Create a Dash app
 app = dash.Dash(__name__)
+server = app.server  # Add this line to expose the Flask server
 
 # Load VAE data and models
 current_dir = os.path.dirname(__file__)
