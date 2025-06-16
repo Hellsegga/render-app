@@ -10,15 +10,25 @@ import io
 import os
 import pandas as pd
 import pickle
+import logging
 from morphomics_exp.utils_analysis import get_2d, inverse_function
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def download_pickle_from_gdrive(file_id):
     """
     Download a pickle file from Google Drive by file ID and return the unpickled object.
     """
+    logger.info(f"Attempting to download pickle file with ID: {file_id}")
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
     response = requests.get(url)
     response.raise_for_status()
+    logger.info(f"Successfully downloaded pickle file: {file_id}")
     return pickle.load(io.BytesIO(response.content))
 
 # Display modes:
@@ -31,30 +41,40 @@ DISPLAY_MODE = 'all'
 # 'both' - show both VAE reconstruction and actual image
 IMAGE_DISPLAY_MODE = 'reconstruction'
 
+logger.info("Initializing Dash application")
 # Create a Dash app
 app = dash.Dash(__name__)
-server = app.server  # Add this line to expose the Flask server
+server = app.server
+
+# Make sure server is callable
+application = server
 
 # Load VAE data and models
 current_dir = os.path.dirname(__file__)
+logger.info(f"Current directory: {current_dir}")
 
+logger.info("Loading VAE pipeline")
 # Load VAE pipeline
 vae_pip = download_pickle_from_gdrive("1tI38ff0p3EAs2eKXKctIkmGJIGSDh07D")
-
+logger.info("Successfully loaded VAE pipeline")
 
 standardizer = vae_pip['standardizer']
 pca, vae = vae_pip['fitted_pca_vae']
+logger.info("Extracted standardizer, PCA, and VAE from pipeline")
 
+logger.info("Loading reduced data")
 # Load reduced data
 mf = download_pickle_from_gdrive("1-uqINacNBm89kS29-Kw2iK9rhh04RfLE")
 mf = mf.reset_index()
 mf.rename(columns={'index': 'old_idcs'}, inplace=True)
+logger.info(f"Loaded reduced data with shape: {mf.shape}")
 
 mf.loc[mf["Model"].isin(["Cx3cr1_het", "Cx3cr1_hom"]), "Condition"] = "Development"
 
 # Filter data for visualization
 cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
 mf_vae_kxa = mf[cond]
+logger.info(f"Filtered data shape: {mf_vae_kxa.shape}")
 
 # Extract and convert time values
 def extract_and_convert(input_string):
@@ -204,8 +224,10 @@ else:  # 'both' mode
 
 def generate_vae_image(hoverData):
     if hoverData is None:
+        logger.debug("No hover data received")
         return dash.no_update
     
+    logger.debug("Generating VAE image")
     # Get hover coordinates
     x, y = hoverData['points'][0]['x'], hoverData['points'][0]['y']
     mouse_pos = np.array([x, y])
@@ -217,6 +239,7 @@ def generate_vae_image(hoverData):
                           scaler=standardizer,
                           filter=None)
     
+    logger.debug("Successfully generated VAE image")
     # Normalize and convert to 2D
     img_normalized = (img - np.min(img)) / (np.max(img) - np.min(img))
     img_2d = get_2d(img_normalized)
@@ -233,8 +256,10 @@ def generate_vae_image(hoverData):
 
 def get_actual_image(hoverData):
     if hoverData is None:
+        logger.debug("No hover data received")
         return dash.no_update
     
+    logger.debug("Getting actual image")
     # Get the point index from hoverData
     point_index = hoverData['points'][0]['pointIndex']
     
@@ -276,6 +301,7 @@ if IMAGE_DISPLAY_MODE == 'reconstruction':
         Input('scatter', 'hoverData')
     )
     def update_image_on_hover(hoverData):
+        logger.debug("Updating image on hover")
         return generate_vae_image(hoverData)
 else:  # 'both' mode
     @app.callback(
@@ -284,8 +310,11 @@ else:  # 'both' mode
         Input('scatter', 'hoverData')
     )
     def update_images_on_hover(hoverData):
+        logger.debug("Updating both images on hover")
         return generate_vae_image(hoverData), get_actual_image(hoverData)
 
+logger.info("Application initialization complete")
+
 if __name__ == '__main__':
-    #app.run(debug=True, host='127.0.0.1', port=8050, use_reloader=False)
+    logger.info("Starting server in development mode")
     app.run_server(debug=False, host='0.0.0.0', port=8080)
