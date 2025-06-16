@@ -1,0 +1,18 @@
+Protocols = [
+        "Vectorizations",
+    ]
+
+[Vectorizations]
+"morphoframe_name" = "ipl_opl"
+
+"save_data" = true
+"save_folderpath" = "../results/vectorization"
+"save_filename" = "sr"
+
+    [Vectorizations.vect_method_parameters]
+        [Vectorizations.vect_method_parameters.stable_ranks]
+            "type" = 'neg'
+            "density" = false
+            "bars_prob" = false
+            # number of bins in a row and column
+            "resolution" = 300

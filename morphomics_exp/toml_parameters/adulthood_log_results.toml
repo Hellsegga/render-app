@@ -1,0 +1,61 @@
+[Log_results]
+# if not 0, must contain the filepath to the morphoframe which will then be saved into morphoframe_name
+# otherwise, `morphoframe_name` is the morphoframe that will be cleaned up
+"morphoframe_name" = "ipl_opl"
+"morphoframe_filepath" = 0
+
+    # List of checks
+    [[Log_results.checks]]
+    name = "ipl_vs_opl"
+    filter = "(df['Region']=='IPL') | (df['Region']=='OPL')"
+    crit = "Region"
+    [[Log_results.checks]]
+    name = "ipl_iso4h_vs_iso48h"
+    filter = "(df['Region']=='IPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Ctrl_Iso48h']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "opl_iso4h_vs_iso48h"
+    filter = "(df['Region']=='OPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Ctrl_Iso48h']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "ipl_iso4h_vs_kxa4h"
+    filter = "(df['Region']=='IPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Ctrl_Kxa4h']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "opl_iso4h_vs_kxa4h"
+    filter = "(df['Region']=='OPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Ctrl_Kxa4h']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "ipl_iso4h_vs_naiveONC"
+    filter = "(df['Region']=='IPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Naive_ONC']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "opl_iso4h_vs_naiveONC"
+    filter = "(df['Region']=='OPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Naive_ONC']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "ipl_iso4h_vs_shamONC"
+    filter = "(df['Region']=='IPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Sham_ONC']))"
+    crit = "Model"
+
+    [[Log_results.checks]]
+    name = "opl_iso4h_vs_shamONC"
+    filter = "(df['Region']=='OPL') & (df['Model'].isin(['Ctrl_Iso4h', 'Sham_ONC']))"
+    crit = "Model"
+
+
+# I would advise saving the cleaned data; value is either `true` or `false` (warning: take note that all the letters are in lower case)
+"save_data" = false
+
+# location where to save the data
+"save_folderpath" = "results/cell"
+
+# if 0, morphOMICs will automatically create a file prefix, i.e., Morphomics.PID[xxx].[barcode_filter].Cleaned.
+# Otherwise, this will be used as the file prefix
+"save_filename" = "logged_results"

@@ -1,0 +1,13 @@
+Protocols = [
+        "Morphometrics",
+    ]
+
+[Morphometrics]
+"morphoframe_name" = "ipl_opl"
+"tmp_folder" = '../results'
+
+"save_data" = true
+"save_folderpath" = "../results/vectorization"
+"save_filename" = "morphometrics"
+
+"concatenate" = true

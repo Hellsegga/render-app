@@ -1,0 +1,27 @@
+Protocols = [
+        "Vectorizations",
+    ]
+
+[Vectorizations]
+"morphoframe_name" = "ipl_opl"
+
+"save_data" = true
+"save_folderpath" = "../results/vectorization"
+"save_filename" = "pi"
+
+    [Vectorizations.vect_method_parameters]
+        [Vectorizations.vect_method_parameters.persistence_image]
+            # Compute de interval of the vectorization for each barcode
+            "rescale_lims" = false
+            # fix interval
+            "xlims" = [0,150]
+            "ylims" = [0,150]
+            "method" = 'isotropic'
+            #"method" = 'kde'
+            # variance of the gaussian kernel
+            "std_isotropic" = 2
+            # weight the bars of the barcode
+            # normalize the vector (see norm methods in utils.py)
+            "norm_method" = "id"
+            # number of pixels in a row and column
+            "resolution" = 100

@@ -1,0 +1,9 @@
+dash
+pandas
+plotly
+requests
+gunicorn
+torch
+Pillow
+scikit-learn
+-e ./morphomics_exp

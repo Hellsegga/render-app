@@ -1,0 +1,46 @@
+Protocols = [
+        "Dim_reductions",
+        "Save_reduced",
+    ]
+
+[Dim_reductions]
+"morphoframe_name" = "ipl_opl"
+
+"filter_pixels" = false
+"pixel_std_cutoff" = 1e-5
+"normalize" = false
+"standardize" = true
+
+"save_data" = true
+"save_dimreducer" = true
+"save_folderpath" = "../results/dim_reduction"
+
+    [Dim_reductions.dimred_method_parameters]                            
+        [Dim_reductions.dimred_method_parameters.umap]
+        # parameters for umap
+        "n_components" = 2
+        "n_neighbors" = 50 
+        "min_dist" = 0.05
+        "spread" = 3.0
+        "random_state" = 10
+        "metric" = "euclidean"
+        "densmap" = false
+
+
+[Save_reduced]
+"morphoframe_name" = "ipl_opl"
+
+"conditions_to_save" = ["Region",
+                        "Condition",
+                        "Model",
+                        "Time",
+                        "Sex",
+                        "Animal"
+                        ]
+
+"dimred_method" = "umap"
+"coordinate_axisnames" = "umap"
+
+"save_folderpath" = "../results/dim_reduction"
+
+

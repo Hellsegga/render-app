@@ -1,0 +1,47 @@
+Protocols = [
+        "Dim_reductions",
+        "Save_reduced",
+    ]
+
+[Dim_reductions]
+"morphoframe_name" = "ipl_opl"
+
+"filter_pixels" = false
+"pixel_std_cutoff" = 5e-5
+"normalize" = false
+"standardize" = true
+
+"save_data" = true
+"save_dimreducer" = true
+"save_folderpath" = "../results/dim_reduction_1000"
+
+    [Dim_reductions.dimred_method_parameters]                 
+        [Dim_reductions.dimred_method_parameters.pca]
+        "n_components"= 64 
+        "svd_solver"= false 
+        "pca_version"= 'standard'
+
+        [Dim_reductions.dimred_method_parameters.vae]
+        "n_components" = 2
+        "nn_layers" = [64, 32, 16, 8]
+        "batch_layer_norm" = false
+        "optimizer" = "cocob"
+        "scheduler" = false
+        "batch_size" = 32
+
+
+[Save_reduced]
+"morphoframe_name" = "ipl_opl"
+
+"conditions_to_save" = ["Region",
+                        "Condition",
+                        "Model",
+                        "Time",
+                        "Sex",
+                        "Animal"
+                        ]
+
+"dimred_method" = "pca_vae"
+"coordinate_axisnames" = "pca_vae"
+
+"save_folderpath" = "../results/dim_reduction_1000"
