@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Output, Input
+from dash import dcc, html, Output, Input, State
 import plotly.graph_objects as go
 import numpy as np
 import base64
@@ -71,10 +71,91 @@ logger.info(f"Loaded reduced data with shape: {mf.shape}")
 
 mf.loc[mf["Model"].isin(["Cx3cr1_het", "Cx3cr1_hom"]), "Condition"] = "Development"
 
-# Filter data for visualization
-cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
-mf_vae_kxa = mf[cond]
-logger.info(f"Filtered data shape: {mf_vae_kxa.shape}")
+def get_filtered_data(cond_choice):
+    if cond_choice == "IPL_dev":
+        cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
+        group_timepoints = [1, 2, 4, 5, 8, 11, 13, 15, 17, 20, 25, 30]
+    elif cond_choice == "IPL_rd10":
+        cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
+        group_timepoints = [10, 15, 20, 29, 40, 44, 55, 65, 90]
+    elif cond_choice == "OPL_dev":
+        cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
+        group_timepoints = [9, 15, 20, 25, 29]
+    elif cond_choice == "OPL_rd10":
+        cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
+        group_timepoints = [10, 15, 29, 44, 65]
+    
+    filtered_data = mf[cond].copy()
+    return filtered_data, group_timepoints
+
+# Compute global axis ranges from all data
+def compute_global_ranges():
+    all_points = []
+    for cond_choice in ["IPL_dev", "IPL_rd10", "OPL_dev", "OPL_rd10"]:
+        filtered_data, _ = get_filtered_data(cond_choice)
+        points = np.array(filtered_data['pca_vae'].tolist())
+        all_points.extend(points)
+    
+    all_points = np.array(all_points)
+    
+    # Filter outliers using the same method as in the plot
+    centroid = np.mean(all_points, axis=0)
+    distances = np.sqrt(np.sum((all_points - centroid)**2, axis=1))
+    std_dev = np.std(distances)
+    threshold = 4 * std_dev
+    filtered_points = all_points[distances <= threshold]
+    
+    # Compute ranges from filtered points
+    x_min, x_max = np.min(filtered_points[:, 0]), np.max(filtered_points[:, 0])
+    y_min, y_max = np.min(filtered_points[:, 1]), np.max(filtered_points[:, 1])
+    
+    # Add some padding (reduced from 10% to 5% since we're already filtering outliers)
+    x_padding = (x_max - x_min) * 0.05
+    y_padding = (y_max - y_min) * 0.05
+    
+    return {
+        'xaxis': {'range': [x_min - x_padding, x_max + x_padding]},
+        'yaxis': {'range': [y_min - y_padding, y_max + y_padding]}
+    }
+
+# Compute global ranges once at startup
+global_ranges = compute_global_ranges()
+
+# Initialize display mode state
+app.layout = html.Div([
+    html.Div([
+        html.Div([
+            html.Span('Display Mode: ', style={'marginRight': '10px'}),
+            dcc.RadioItems(
+                id='display-mode-radio',
+                options=[
+                    {'label': 'Show All Points', 'value': 'all'},
+                    {'label': 'Show Mean Points', 'value': 'mean'}
+                ],
+                value='all',
+                labelStyle={'display': 'inline-block', 'margin': '10px'}
+            )
+        ], style={'display': 'inline-block', 'marginRight': '30px'}),
+        html.Div([
+            html.Span('Data Selection: ', style={'marginRight': '10px'}),
+            dcc.RadioItems(
+                id='condition-radio',
+                options=[
+                    {'label': 'IPL Development', 'value': 'IPL_dev'},
+                    {'label': 'IPL rd10', 'value': 'IPL_rd10'},
+                    {'label': 'OPL Development', 'value': 'OPL_dev'},
+                    {'label': 'OPL rd10', 'value': 'OPL_rd10'}
+                ],
+                value='IPL_rd10',
+                labelStyle={'display': 'inline-block', 'margin': '10px'}
+            )
+        ], style={'display': 'inline-block'})
+    ], style={'textAlign': 'center', 'margin': '20px'}),
+    html.Div([
+        dcc.Graph(id='scatter', style={'width': '45vw', 'height': '80vh'}),
+        html.Img(id='image', style={'width': '45vw', 'height': '80vh', 'border': '1px solid black'})
+    ], style={'display': 'flex'})
+])
 
 # Extract and convert time values
 def extract_and_convert(input_string):
@@ -91,136 +172,103 @@ def extract_and_convert(input_string):
     except ValueError:
         return None
 
-mf_vae_kxa["Time"] = mf_vae_kxa["Time"].apply(extract_and_convert)
-
-# Filter outliers
-points = np.array(mf_vae_kxa['pca_vae'].tolist())
-centroid = np.mean(points, axis=0)
-distances = np.sqrt(np.sum((points - centroid)**2, axis=1))
-std_dev = np.std(distances)
-threshold = 4 * std_dev
-mf_vae_kxa = mf_vae_kxa[distances <= threshold].copy()
-
-# Create scatter plot
-if DISPLAY_MODE == 'all':
-    # Use all points
-    x, y = zip(*mf_vae_kxa['pca_vae'])
-    time_values = mf_vae_kxa['Time']
-    hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
-                 for r, m, t in zip(mf_vae_kxa['Region'], mf_vae_kxa['Model'], mf_vae_kxa['Time'])]
-else:
-    # Calculate mean coordinates for each unique combination of Region, Model, Time
-    # Define timepoints to keep for each group
-
-    ## For OPL use these
-    #group_timepoints = [10, 15, 29, 44, 65]  # Customize these timepoints
-    #group_timepoints = [9, 15, 20, 25, 29]  # Customize these timepoints
-
-    ## For IPL use these
-    #group_timepoints = [10, 15, 20, 29, 40, 44, 55, 65, 90]  # Customize these timepoints
-    group_timepoints = [1, 2, 4, 5, 8, 11, 13, 15, 17, 20, 25, 30]  # Customize these timepoints
-
-    # All timepoints
-    #group_timepoints = mf_vae_kxa['Time'].unique()
-
-    # Filter dataframe for each group with their respective timepoints
-    group_df = mf_vae_kxa[mf_vae_kxa['Time'].isin(group_timepoints)]
-
-    # Combine filtered groups and calculate means
-    means_per_timepoint = group_df.groupby(['Region', 'Condition', 'Model', 'Time'])["pca_vae"].mean().reset_index()
-    
-    # Sort by Time to ensure correct arrow direction
-    means_per_timepoint = means_per_timepoint.sort_values('Time')
-        
-    # Extract x, y coordinates from mean_coords
-    x, y = zip(*means_per_timepoint['pca_vae'])
-    time_values = means_per_timepoint['Time']
-    hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
-                 for r, m, t in zip(means_per_timepoint['Region'], means_per_timepoint['Model'], means_per_timepoint['Time'])]
-
-fig = go.Figure()
-
-# Add arrows between points for each Region/Model combination
-if DISPLAY_MODE == 'mean':
-    # Get unique combinations of Region and Model
-    unique_combinations = means_per_timepoint[['Region', 'Model']].drop_duplicates()
-    
-    for _, row in unique_combinations.iterrows():
-        # Filter data for this Region/Model combination
-        group_data = means_per_timepoint[
-            (means_per_timepoint['Region'] == row['Region']) & 
-            (means_per_timepoint['Model'] == row['Model'])
-        ].sort_values('Time')
-        
-        # Create arrows between consecutive points
-        for i in range(len(group_data) - 1):
-            x_start, y_start = group_data.iloc[i]['pca_vae']
-            x_end, y_end = group_data.iloc[i + 1]['pca_vae']
-            
-            # Calculate vector between points
-            dx = x_end - x_start
-            dy = y_end - y_start
-            
-            # Scale vector to make arrow shorter (95% of distance)
-            scale = 0.95
-            x_arrow = x_start + dx * scale
-            y_arrow = y_start + dy * scale
-            
-            # Add arrow
-            fig.add_annotation(
-                x=x_arrow, y=y_arrow,
-                ax=x_start, ay=y_start,
-                xref="x", yref="y",
-                axref="x", ayref="y",
-                showarrow=True,
-                arrowhead=2,
-                arrowsize=1,
-                arrowwidth=1,
-                arrowcolor="gray"
-            )
-
-# Add scatter points
-fig.add_trace(go.Scatter(
-    x=x,
-    y=y,
-    mode='markers',
-    marker=dict(
-        size=10,
-        color=time_values,
-        showscale=True,
-        colorbar=dict(title='Time')
-    ),
-    name='data',
-    text=hover_text,
-    hoverinfo='text'
-))
-
-fig.update_layout(
-    title='VAE Latent Space',
-    hovermode='closest',
-    dragmode='pan',
-    xaxis_title='Latent Dimension 1',
-    yaxis_title='Latent Dimension 2'
+@app.callback(
+    Output('scatter', 'figure'),
+    [Input('display-mode-radio', 'value'),
+     Input('condition-radio', 'value')]
 )
+def update_graph(display_mode, cond_choice):
+    # Get filtered data based on condition choice
+    mf_vae_kxa, group_timepoints = get_filtered_data(cond_choice)
+    
+    # Extract and convert time values
+    mf_vae_kxa["Time"] = mf_vae_kxa["Time"].apply(extract_and_convert)
+    
+    # Filter outliers
+    points = np.array(mf_vae_kxa['pca_vae'].tolist())
+    centroid = np.mean(points, axis=0)
+    distances = np.sqrt(np.sum((points - centroid)**2, axis=1))
+    std_dev = np.std(distances)
+    threshold = 4 * std_dev
+    mf_vae_kxa = mf_vae_kxa[distances <= threshold].copy()
+    
+    if display_mode == 'all':
+        # Use all points
+        x, y = zip(*mf_vae_kxa['pca_vae'])
+        time_values = mf_vae_kxa['Time']
+        hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
+                     for r, m, t in zip(mf_vae_kxa['Region'], mf_vae_kxa['Model'], mf_vae_kxa['Time'])]
+    else:
+        # Calculate mean coordinates for each unique combination of Region, Model, Time
+        group_df = mf_vae_kxa[mf_vae_kxa['Time'].isin(group_timepoints)]
+        means_per_timepoint = group_df.groupby(['Region', 'Condition', 'Model', 'Time'])["pca_vae"].mean().reset_index()
+        means_per_timepoint = means_per_timepoint.sort_values('Time')
+        
+        x, y = zip(*means_per_timepoint['pca_vae'])
+        time_values = means_per_timepoint['Time']
+        hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
+                     for r, m, t in zip(means_per_timepoint['Region'], means_per_timepoint['Model'], means_per_timepoint['Time'])]
 
-# App layout
-if IMAGE_DISPLAY_MODE == 'reconstruction':
-    app.layout = html.Div([
-        html.Div([
-            dcc.Graph(id='scatter', figure=fig, style={'width': '45vw', 'height': '80vh'}),
-            html.Img(id='image', style={'width': '45vw', 'height': '80vh', 'border': '1px solid black'})
-        ], style={'display': 'flex'})
-    ])
-else:  # 'both' mode
-    app.layout = html.Div([
-        html.Div([
-            dcc.Graph(id='scatter', figure=fig, style={'width': '45vw', 'height': '80vh'}),
-            html.Div([
-                html.Img(id='reconstruction', style={'width': '45vw', 'height': '40vh', 'border': '1px solid black'}),
-                html.Img(id='actual', style={'width': '45vw', 'height': '40vh', 'border': '1px solid black'})
-            ], style={'display': 'flex', 'flexDirection': 'column'})
-        ], style={'display': 'flex'})
-    ])
+    fig = go.Figure()
+
+    # Add arrows between points for each Region/Model combination
+    if display_mode == 'mean':
+        unique_combinations = means_per_timepoint[['Region', 'Model']].drop_duplicates()
+        
+        for _, row in unique_combinations.iterrows():
+            group_data = means_per_timepoint[
+                (means_per_timepoint['Region'] == row['Region']) & 
+                (means_per_timepoint['Model'] == row['Model'])
+            ].sort_values('Time')
+            
+            for i in range(len(group_data) - 1):
+                x_start, y_start = group_data.iloc[i]['pca_vae']
+                x_end, y_end = group_data.iloc[i + 1]['pca_vae']
+                
+                dx = x_end - x_start
+                dy = y_end - y_start
+                
+                scale = 0.95
+                x_arrow = x_start + dx * scale
+                y_arrow = y_start + dy * scale
+                
+                fig.add_annotation(
+                    x=x_arrow, y=y_arrow,
+                    ax=x_start, ay=y_start,
+                    xref="x", yref="y",
+                    axref="x", ayref="y",
+                    showarrow=True,
+                    arrowhead=2,
+                    arrowsize=1,
+                    arrowwidth=1,
+                    arrowcolor="gray"
+                )
+
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=y,
+        mode='markers',
+        marker=dict(
+            size=10,
+            color=time_values,
+            showscale=True,
+            colorbar=dict(title='Time')
+        ),
+        name='data',
+        text=hover_text,
+        hoverinfo='text'
+    ))
+
+    fig.update_layout(
+        title='VAE Latent Space',
+        hovermode='closest',
+        dragmode='pan',
+        xaxis_title='Latent Dimension 1',
+        yaxis_title='Latent Dimension 2',
+        **global_ranges  # Apply the global ranges
+    )
+    
+    return fig
 
 def generate_vae_image(hoverData):
     if hoverData is None:
