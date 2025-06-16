@@ -1,4 +1,6 @@
 from app import app
 
-# Create the WSGI application
-application = app.server 
+def create_app():
+    return app.server
+
+application = create_app() 
