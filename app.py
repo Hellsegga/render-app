@@ -71,28 +71,29 @@ logger.info(f"Loaded reduced data with shape: {mf.shape}")
 
 mf.loc[mf["Model"].isin(["Cx3cr1_het", "Cx3cr1_hom"]), "Condition"] = "Development"
 
-def get_filtered_data(cond_choice):
+def get_filtered_data(cond_choice, return_manual_timepoints=False):
     if cond_choice == "IPL_dev":
         cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
-        group_timepoints = [1, 2, 4, 5, 8, 11, 13, 15, 17, 20, 25, 30]
+        manual_timepoints = [1, 2, 4, 5, 8, 11, 13, 15, 17, 20, 25, 30]
     elif cond_choice == "IPL_rd10":
         cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
-        group_timepoints = [10, 15, 20, 29, 40, 44, 55, 65, 90]
+        manual_timepoints = [10, 15, 20, 29, 33, 40, 44, 55, 65, 90]
     elif cond_choice == "OPL_dev":
         cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
-        group_timepoints = [9, 15, 20, 25, 29]
+        manual_timepoints = [7, 8, 11, 13, 17, 22, 25, 29]
     elif cond_choice == "OPL_rd10":
         cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
-        group_timepoints = [10, 15, 29, 44, 65]
-    
+        manual_timepoints = [10, 15, 29, 31, 36, 44, 50, 55, 90]
     filtered_data = mf[cond].copy()
-    return filtered_data, group_timepoints
+    if return_manual_timepoints:
+        return filtered_data, manual_timepoints
+    return filtered_data
 
 # Compute global axis ranges from all data
 def compute_global_ranges():
     all_points = []
     for cond_choice in ["IPL_dev", "IPL_rd10", "OPL_dev", "OPL_rd10"]:
-        filtered_data, _ = get_filtered_data(cond_choice)
+        filtered_data = get_filtered_data(cond_choice)
         points = np.array(filtered_data['pca_vae'].tolist())
         all_points.extend(points)
     
@@ -149,6 +150,18 @@ app.layout = html.Div([
                 value='IPL_rd10',
                 labelStyle={'display': 'inline-block', 'margin': '10px'}
             )
+        ], style={'display': 'inline-block', 'marginRight': '30px'}),
+        html.Div([
+            html.Span('Mean Points: ', style={'marginRight': '10px'}),
+            dcc.RadioItems(
+                id='mean-mode-radio',
+                options=[
+                    {'label': 'All Timepoints', 'value': 'all'},
+                    {'label': 'Selection', 'value': 'selection'}
+                ],
+                value='selection',
+                labelStyle={'display': 'inline-block', 'margin': '10px'}
+            )
         ], style={'display': 'inline-block'})
     ], style={'textAlign': 'center', 'margin': '20px'}),
     html.Div([
@@ -175,11 +188,12 @@ def extract_and_convert(input_string):
 @app.callback(
     Output('scatter', 'figure'),
     [Input('display-mode-radio', 'value'),
-     Input('condition-radio', 'value')]
+     Input('condition-radio', 'value'),
+     Input('mean-mode-radio', 'value')]
 )
-def update_graph(display_mode, cond_choice):
+def update_graph(display_mode, cond_choice, mean_mode):
     # Get filtered data based on condition choice
-    mf_vae_kxa, group_timepoints = get_filtered_data(cond_choice)
+    mf_vae_kxa, manual_timepoints = get_filtered_data(cond_choice, return_manual_timepoints=True)
     
     # Extract and convert time values
     mf_vae_kxa["Time"] = mf_vae_kxa["Time"].apply(extract_and_convert)
@@ -199,11 +213,14 @@ def update_graph(display_mode, cond_choice):
         hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
                      for r, m, t in zip(mf_vae_kxa['Region'], mf_vae_kxa['Model'], mf_vae_kxa['Time'])]
     else:
-        # Calculate mean coordinates for each unique combination of Region, Model, Time
+        # Determine group_timepoints based on mean_mode
+        if mean_mode == 'all':
+            group_timepoints = mf_vae_kxa['Time'].unique()
+        else:
+            group_timepoints = manual_timepoints
         group_df = mf_vae_kxa[mf_vae_kxa['Time'].isin(group_timepoints)]
         means_per_timepoint = group_df.groupby(['Region', 'Condition', 'Model', 'Time'])["pca_vae"].mean().reset_index()
         means_per_timepoint = means_per_timepoint.sort_values('Time')
-        
         x, y = zip(*means_per_timepoint['pca_vae'])
         time_values = means_per_timepoint['Time']
         hover_text = [f"Region: {r}<br>Model: {m}<br>Time: {t}" 
@@ -214,24 +231,19 @@ def update_graph(display_mode, cond_choice):
     # Add arrows between points for each Region/Model combination
     if display_mode == 'mean':
         unique_combinations = means_per_timepoint[['Region', 'Model']].drop_duplicates()
-        
         for _, row in unique_combinations.iterrows():
             group_data = means_per_timepoint[
                 (means_per_timepoint['Region'] == row['Region']) & 
                 (means_per_timepoint['Model'] == row['Model'])
             ].sort_values('Time')
-            
             for i in range(len(group_data) - 1):
                 x_start, y_start = group_data.iloc[i]['pca_vae']
                 x_end, y_end = group_data.iloc[i + 1]['pca_vae']
-                
                 dx = x_end - x_start
                 dy = y_end - y_start
-                
                 scale = 0.95
                 x_arrow = x_start + dx * scale
                 y_arrow = y_start + dy * scale
-                
                 fig.add_annotation(
                     x=x_arrow, y=y_arrow,
                     ax=x_start, ay=y_start,
