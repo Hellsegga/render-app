@@ -77,13 +77,13 @@ def get_filtered_data(cond_choice, return_manual_timepoints=False):
         manual_timepoints = [1, 2, 4, 5, 8, 11, 13, 15, 17, 20, 25, 30]
     elif cond_choice == "IPL_rd10":
         cond = (mf["Region"]=="IPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
-        manual_timepoints = [10, 15, 20, 29, 33, 40, 44, 55, 65, 90]
+        manual_timepoints = [10, 15, 20, 29, 40, 44, 55, 65, 90]
     elif cond_choice == "OPL_dev":
         cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Development") & (mf["Model"]=="Cx3cr1_het")
         manual_timepoints = [7, 8, 11, 13, 17, 22, 25, 29]
     elif cond_choice == "OPL_rd10":
         cond = (mf["Region"]=="OPL") & (mf["Condition"]=="Degeneration") & (mf["Model"]=="rd10")
-        manual_timepoints = [10, 15, 29, 31, 36, 44, 50, 55, 90]
+        manual_timepoints = [10, 15, 29, 31, 44, 50, 90]
     filtered_data = mf[cond].copy()
     if return_manual_timepoints:
         return filtered_data, manual_timepoints
